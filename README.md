@@ -1,2 +1,3 @@
 # PHP VK API переведенный на C++
-source: https://github.com/VKCOM/vk-php-sdk
+Исходник: https://github.com/VKCOM/vk-php-sdk
+Зависимости: curl
