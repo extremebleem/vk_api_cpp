@@ -23,6 +23,7 @@ public:
 
     ~VKApiRequest();
 
+    nlohmann::json get(const std::string& method, const std::string& access_token, const std::unordered_map<std::string, std::string>& params = {});
     nlohmann::json post(const std::string& method, const std::string& access_token, const std::unordered_map<std::string, std::string>& params = {});
 
     nlohmann::json upload(const std::string& upload_url, const std::string& parameter_name, const std::string& path);

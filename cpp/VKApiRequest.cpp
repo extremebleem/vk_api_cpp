@@ -58,7 +58,50 @@ nlohmann::json VKApiRequest::post(const std::string& method, const std::string& 
     long http_code = 0;
 
     curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl_, CURLOPT_HTTPGET, 0L);
     curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, post_data.c_str());
+    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &response_body);
+
+    CURLcode res = curl_easy_perform(curl_);
+    curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, &http_code);
+
+    if (res != CURLE_OK) {
+        throw std::runtime_error("CURL error: " + std::string(curl_easy_strerror(res)));
+    }
+
+    return parseResponse(response_body, http_code);
+}
+
+nlohmann::json VKApiRequest::get(const std::string& method, const std::string& access_token, const std::unordered_map<std::string, std::string>& params) {
+    auto formatted_params = formatParams(params);
+    formatted_params[PARAM_ACCESS_TOKEN] = access_token;
+
+    if (formatted_params.find(PARAM_VERSION) == formatted_params.end()) {
+        formatted_params[PARAM_VERSION] = version_;
+    }
+
+    if (!language_.empty() && formatted_params.find(PARAM_LANG) == formatted_params.end()) {
+        formatted_params[PARAM_LANG] = language_;
+    }
+
+    std::string url = host_ + "/" + method;
+    std::string query;
+
+    for (const auto& pair : formatted_params) {
+        if (!query.empty()) query += "&";
+        query += pair.first + "=" + curl_easy_escape(curl_, pair.second.c_str(), pair.second.length());
+    }
+    if (!query.empty()) {
+        url += "?" + query;
+    }
+
+    std::string response_body;
+    long http_code = 0;
+
+    curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl_, CURLOPT_HTTPGET, 1L);
+    curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, nullptr);
     curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &response_body);
 

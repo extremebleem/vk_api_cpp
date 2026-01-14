@@ -20,6 +20,7 @@
 #include "Actions/Likes.hpp"
 #include "Actions/Market.hpp"
 #include "Actions/Apps.hpp"
+#include "Actions/Audio.hpp"
 #include "Actions/Board.hpp"
 #include "Actions/Docs.hpp"
 #include "Actions/Fave.hpp"
@@ -94,6 +95,8 @@ std::shared_ptr<ActionInterface> VKApiClient::getAction(const std::string& name)
             instances_[lower_name] = std::make_shared<Market>(request_);
         } else if (lower_name == "apps") {
             instances_[lower_name] = std::make_shared<Apps>(request_);
+        } else if (lower_name == "audio") {
+            instances_[lower_name] = std::make_shared<Audio>(request_);
         } else if (lower_name == "board") {
             instances_[lower_name] = std::make_shared<Board>(request_);
         } else if (lower_name == "docs") {
