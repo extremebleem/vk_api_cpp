@@ -37,6 +37,8 @@ private:
     std::mutex curlMutex_;
 
     static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp);
+    static std::string RedactSensitive(std::string text);
+    static int CurlDebugCallback(CURL* curl, curl_infotype type, char* data, size_t size, void* userptr);
 
     nlohmann::json parseResponse(const std::string& response_body, long http_code);
 

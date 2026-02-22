@@ -6,9 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace {
-
-std::string redactSensitive(std::string text)
+std::string VKApiRequest::RedactSensitive(std::string text)
 {
     const auto redactByKey = [&text](const char* key) {
         size_t pos = 0;
@@ -31,11 +29,11 @@ std::string redactSensitive(std::string text)
     return text;
 }
 
-int curlDebugCallback(CURL*,
-                      curl_infotype type,
-                      char* data,
-                      size_t size,
-                      void*)
+int VKApiRequest::CurlDebugCallback(CURL*,
+                                    curl_infotype type,
+                                    char* data,
+                                    size_t size,
+                                    void*)
 {
     if (data == nullptr || size == 0) {
         return 0;
@@ -71,7 +69,7 @@ int curlDebugCallback(CURL*,
 
     if (type == CURLINFO_TEXT || type == CURLINFO_HEADER_IN || type == CURLINFO_HEADER_OUT) {
         std::string payload(data, size);
-        payload = redactSensitive(std::move(payload));
+        payload = RedactSensitive(std::move(payload));
         std::fprintf(stderr, "[curl][%s] %s", typeLabel, payload.c_str());
         if (payload.empty() || payload.back() != '\n') {
             std::fprintf(stderr, "\n");
@@ -82,8 +80,6 @@ int curlDebugCallback(CURL*,
     std::fflush(stderr);
     return 0;
 }
-
-} // namespace
 
 const std::string VKApiRequest::PARAM_VERSION = "v";
 const std::string VKApiRequest::PARAM_ACCESS_TOKEN = "access_token";
@@ -105,7 +101,7 @@ VKApiRequest::VKApiRequest(const std::string& api_version, const std::string& la
     curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1L);
 #if defined(_DEBUG)
     curl_easy_setopt(curl_, CURLOPT_VERBOSE, 1L);
-    curl_easy_setopt(curl_, CURLOPT_DEBUGFUNCTION, curlDebugCallback);
+    curl_easy_setopt(curl_, CURLOPT_DEBUGFUNCTION, CurlDebugCallback);
 #endif
 }
 
