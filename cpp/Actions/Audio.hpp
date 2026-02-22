@@ -41,12 +41,21 @@ public:
     // audio.getLyrics
     nlohmann::json getLyrics(const std::string& access_token,
                              const std::unordered_map<std::string, std::string>& params = {});
+    // audio.getStreamMixAudios
+    nlohmann::json getStreamMixAudios(const std::string& access_token,
+                                      const std::unordered_map<std::string, std::string>& params = {});
     // audio.reorder
     nlohmann::json reorder(const std::string& access_token,
                            const std::unordered_map<std::string, std::string>& params = {});
     // audio.delete
     nlohmann::json deleteAudio(const std::string& access_token,
                                const std::unordered_map<std::string, std::string>& params = {});
+    // audio.add
+    nlohmann::json add(const std::string& access_token,
+                       const std::unordered_map<std::string, std::string>& params = {});
+    // audio.restore
+    nlohmann::json restore(const std::string& access_token,
+                           const std::unordered_map<std::string, std::string>& params = {});
     // audio.addAlbum
     nlohmann::json addAlbum(const std::string& access_token,
                             const std::unordered_map<std::string, std::string>& params = {});

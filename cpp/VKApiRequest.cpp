@@ -2,6 +2,88 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+namespace {
+
+std::string redactSensitive(std::string text)
+{
+    const auto redactByKey = [&text](const char* key) {
+        size_t pos = 0;
+        const size_t keyLen = std::strlen(key);
+        while ((pos = text.find(key, pos)) != std::string::npos) {
+            const size_t valueStart = pos + keyLen;
+            size_t valueEnd = text.find_first_of("& \r\n", valueStart);
+            if (valueEnd == std::string::npos) {
+                valueEnd = text.size();
+            }
+            if (valueEnd > valueStart) {
+                text.replace(valueStart, valueEnd - valueStart, "***");
+            }
+            pos = valueStart + 3;
+        }
+    };
+
+    redactByKey("access_token=");
+    redactByKey("access_key=");
+    return text;
+}
+
+int curlDebugCallback(CURL*,
+                      curl_infotype type,
+                      char* data,
+                      size_t size,
+                      void*)
+{
+    if (data == nullptr || size == 0) {
+        return 0;
+    }
+
+    const char* typeLabel = "OTHER";
+    switch (type) {
+    case CURLINFO_TEXT:
+        typeLabel = "TEXT";
+        break;
+    case CURLINFO_HEADER_IN:
+        typeLabel = "HEADER_IN";
+        break;
+    case CURLINFO_HEADER_OUT:
+        typeLabel = "HEADER_OUT";
+        break;
+    case CURLINFO_DATA_IN:
+        typeLabel = "DATA_IN";
+        break;
+    case CURLINFO_DATA_OUT:
+        typeLabel = "DATA_OUT";
+        break;
+    case CURLINFO_SSL_DATA_IN:
+        typeLabel = "SSL_DATA_IN";
+        break;
+    case CURLINFO_SSL_DATA_OUT:
+        typeLabel = "SSL_DATA_OUT";
+        break;
+    case CURLINFO_END:
+        typeLabel = "END";
+        break;
+    }
+
+    if (type == CURLINFO_TEXT || type == CURLINFO_HEADER_IN || type == CURLINFO_HEADER_OUT) {
+        std::string payload(data, size);
+        payload = redactSensitive(std::move(payload));
+        std::fprintf(stderr, "[curl][%s] %s", typeLabel, payload.c_str());
+        if (payload.empty() || payload.back() != '\n') {
+            std::fprintf(stderr, "\n");
+        }
+    } else {
+        std::fprintf(stderr, "[curl][%s] %zu bytes\n", typeLabel, size);
+    }
+    std::fflush(stderr);
+    return 0;
+}
+
+} // namespace
 
 const std::string VKApiRequest::PARAM_VERSION = "v";
 const std::string VKApiRequest::PARAM_ACCESS_TOKEN = "access_token";
@@ -20,6 +102,11 @@ VKApiRequest::VKApiRequest(const std::string& api_version, const std::string& la
         throw std::runtime_error("Failed to initialize CURL");
     }
     curl_easy_setopt(curl_, CURLOPT_TIMEOUT, CONNECTION_TIMEOUT);
+    curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1L);
+#if defined(_DEBUG)
+    curl_easy_setopt(curl_, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(curl_, CURLOPT_DEBUGFUNCTION, curlDebugCallback);
+#endif
 }
 
 VKApiRequest::~VKApiRequest() {
@@ -35,6 +122,7 @@ size_t VKApiRequest::WriteCallback(void* contents, size_t size, size_t nmemb, st
 }
 
 nlohmann::json VKApiRequest::post(const std::string& method, const std::string& access_token, const std::unordered_map<std::string, std::string>& params) {
+    std::lock_guard<std::mutex> lock(curlMutex_);
     auto formatted_params = formatParams(params);
     formatted_params[PARAM_ACCESS_TOKEN] = access_token;
 
@@ -51,7 +139,12 @@ nlohmann::json VKApiRequest::post(const std::string& method, const std::string& 
 
     for (const auto& pair : formatted_params) {
         if (!post_data.empty()) post_data += "&";
-        post_data += pair.first + "=" + curl_easy_escape(curl_, pair.second.c_str(), pair.second.length());
+        char *escaped = curl_easy_escape(curl_, pair.second.c_str(), static_cast<int>(pair.second.length()));
+        if (!escaped) {
+            throw std::runtime_error("CURL error: failed to escape param");
+        }
+        post_data += pair.first + "=" + escaped;
+        curl_free(escaped);
     }
 
     std::string response_body;
@@ -74,6 +167,7 @@ nlohmann::json VKApiRequest::post(const std::string& method, const std::string& 
 }
 
 nlohmann::json VKApiRequest::get(const std::string& method, const std::string& access_token, const std::unordered_map<std::string, std::string>& params) {
+    std::lock_guard<std::mutex> lock(curlMutex_);
     auto formatted_params = formatParams(params);
     formatted_params[PARAM_ACCESS_TOKEN] = access_token;
 
@@ -90,7 +184,12 @@ nlohmann::json VKApiRequest::get(const std::string& method, const std::string& a
 
     for (const auto& pair : formatted_params) {
         if (!query.empty()) query += "&";
-        query += pair.first + "=" + curl_easy_escape(curl_, pair.second.c_str(), pair.second.length());
+        char *escaped = curl_easy_escape(curl_, pair.second.c_str(), static_cast<int>(pair.second.length()));
+        if (!escaped) {
+            throw std::runtime_error("CURL error: failed to escape param");
+        }
+        query += pair.first + "=" + escaped;
+        curl_free(escaped);
     }
     if (!query.empty()) {
         url += "?" + query;
@@ -100,8 +199,12 @@ nlohmann::json VKApiRequest::get(const std::string& method, const std::string& a
     long http_code = 0;
 
     curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl_, CURLOPT_CUSTOMREQUEST, nullptr);
+    curl_easy_setopt(curl_, CURLOPT_NOBODY, 0L);
+    curl_easy_setopt(curl_, CURLOPT_POST, 0L);
+    curl_easy_setopt(curl_, CURLOPT_UPLOAD, 0L);
     curl_easy_setopt(curl_, CURLOPT_HTTPGET, 1L);
-    curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, nullptr);
+    curl_easy_setopt(curl_, CURLOPT_POSTFIELDSIZE, 0L);
     curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &response_body);
 

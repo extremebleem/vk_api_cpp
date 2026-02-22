@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <memory>
+#include <mutex>
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
@@ -33,6 +34,7 @@ private:
     std::string version_;
     std::string language_;
     CURL* curl_;
+    std::mutex curlMutex_;
 
     static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp);
 

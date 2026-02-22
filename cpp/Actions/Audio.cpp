@@ -52,6 +52,15 @@ nlohmann::json Audio::getLyrics(const std::string& access_token,
     return request_->post("audio.getLyrics", access_token, params);
 }
 
+nlohmann::json Audio::getStreamMixAudios(const std::string& access_token,
+                                         const std::unordered_map<std::string, std::string>& params) {
+    auto merged = params;
+    if (merged.find("client_id") == merged.end()) {
+        merged["client_id"] = "6287487";
+    }
+    return request_->get("audio.getStreamMixAudios", access_token, merged);
+}
+
 nlohmann::json Audio::reorder(const std::string& access_token,
                               const std::unordered_map<std::string, std::string>& params) {
     return request_->post("audio.reorder", access_token, params);
@@ -60,6 +69,20 @@ nlohmann::json Audio::reorder(const std::string& access_token,
 nlohmann::json Audio::deleteAudio(const std::string& access_token,
                                   const std::unordered_map<std::string, std::string>& params) {
     return request_->post("audio.delete", access_token, params);
+}
+
+nlohmann::json Audio::add(const std::string& access_token,
+                          const std::unordered_map<std::string, std::string>& params) {
+    return request_->post("audio.add", access_token, params);
+}
+
+nlohmann::json Audio::restore(const std::string& access_token,
+                              const std::unordered_map<std::string, std::string>& params) {
+    auto merged = params;
+    if (merged.find("client_id") == merged.end()) {
+        merged["client_id"] = "6287487";
+    }
+    return request_->post("audio.restore", access_token, merged);
 }
 
 nlohmann::json Audio::addAlbum(const std::string& access_token,
